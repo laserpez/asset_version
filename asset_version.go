@@ -59,6 +59,7 @@ func main() {
 		result := Asset{}
 		err = coll.Find(query).One(&result)
 		if err != nil {
+			// TODO: return a 404 here if err == not found
 			panic(err)
 		}
 
