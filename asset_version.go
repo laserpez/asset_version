@@ -24,13 +24,16 @@ func main() {
 	insertFakeAssets(coll)
 
 	// Initialize HTTP server
-	r := gin.Default()
+	r := gin.New()
 	// create endpoint
 	r.GET("/asset_version/:divisionCode/:assetType/slot", func(c *gin.Context) {
 		divisionCode := c.Params.ByName("divisionCode")
 		assetType := toInt(c.Params.ByName("assetType"))
 		environment := getQueryStringParameter(c.Request, "environment")
-		asset := findAsset(coll, divisionCode, assetType, environment)
+		asset, err := findAsset(coll, divisionCode, assetType, environment)
+		if err != nil {
+			c.String(404, err.Error())
+		}
 		c.JSON(200, asset)
 	})
 
@@ -38,7 +41,7 @@ func main() {
 	r.Run(":8080")
 }
 
-func findAsset(coll *mgo.Collection, divisionCode string, assetType int64, environment string) *Asset {
+func findAsset(coll *mgo.Collection, divisionCode string, assetType int64, environment string) (*Asset, error) {
 	// FIXME: there probably is a way to make bson from an Asset
 	// note: lowercase keys for now
 	query := bson.M{
@@ -51,9 +54,9 @@ func findAsset(coll *mgo.Collection, divisionCode string, assetType int64, envir
 	err := coll.Find(query).One(&result)
 	if err != nil {
 		// TODO: return &result, err
-		panic(err)
+		return &result, err
 	}
-	return &result
+	return &result, nil
 }
 
 func getQueryStringParameter(req *http.Request, parameter string) string {
