@@ -110,8 +110,8 @@ func insertFakeAssets(c *mgo.Collection) {
 			Environment:  "preview",
 		},
 	}
-	for _, a := range assets {
-		err := c.Insert(a)
+	for _, asset := range assets {
+		err := c.Insert(asset)
 		if err != nil {
 			panic(err)
 		}
