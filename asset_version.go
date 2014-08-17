@@ -1,70 +1,84 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"labix.org/v2/mgo"
-	"labix.org/v2/mgo/bson"
 )
 
 // Asset contains the SOLR SlotID for the given details
 type Asset struct {
-	SlotID       int
-	AssetType    int
-	DivisionCode string
-	Environment  string
+	SlotID       int    `bson:"slotID,omitempty"`
+	AssetType    int    `bson:"assetType"`
+	DivisionCode string `bson:"divisionCode"`
+	Environment  string `bson:"environment,omitempty"`
 }
 
 func main() {
 	mongoSession := getDBSession("localhost")
-	defer mongoSession.Close()
+	defer mongoSession.Close() // defer runs when the enclosing func (in this case, `main`) returns
+
 	coll := mongoSession.DB("test").C("assetVersions")
 	insertFakeAssets(coll)
 
 	// Initialize HTTP server
-	r := gin.New()
+	r := gin.Default()
 	// create endpoint
 	r.GET("/asset_version/:divisionCode/:assetType/slot", func(c *gin.Context) {
 		divisionCode := c.Params.ByName("divisionCode")
 		assetType := toInt(c.Params.ByName("assetType"))
-		environment := getQueryStringParameter(c.Request, "environment")
-		asset, err := findAsset(coll, divisionCode, assetType, environment)
+		query := Asset{
+			DivisionCode: divisionCode,
+			AssetType:    assetType,
+		}
+
+		environment, err := getQueryStringParameter(c.Request, "environment")
+		if err == nil {
+			query.Environment = environment
+		}
+
+		fmt.Println(query)
+
+		asset, err := findAsset(coll, &query)
+
 		if err != nil {
 			c.String(404, err.Error())
+		} else {
+			c.JSON(200, asset)
 		}
-		c.JSON(200, asset)
+
 	})
 
 	// Launch server and listen on 0.0.0.0:8080
 	r.Run(":8080")
 }
 
-func findAsset(coll *mgo.Collection, divisionCode string, assetType int64, environment string) (*Asset, error) {
-	// FIXME: there probably is a way to make bson from an Asset
-	// note: lowercase keys for now
-	query := bson.M{
-		"divisioncode": divisionCode,
-		"assettype":    assetType,
-		// TODO: actually use the environment passed in
-	}
-
+func findAsset(coll *mgo.Collection, query *Asset) (*Asset, error) {
 	result := Asset{}
 	err := coll.Find(query).One(&result)
 	if err != nil {
-		// TODO: return &result, err
 		return &result, err
 	}
 	return &result, nil
 }
 
-func getQueryStringParameter(req *http.Request, parameter string) string {
+type errorString struct {
+	message string
+}
+
+func (s errorString) Error() string {
+	return s.message
+}
+
+func getQueryStringParameter(req *http.Request, parameter string) (string, error) {
 	values := req.URL.Query()[parameter]
 	if len(values) == 0 {
-		return ""
+		return "", errorString{message: "no such parameter"}
 	}
-	return values[0]
+	return values[0], nil
 }
 
 // getSession returns a session of mongodb running on host
@@ -112,7 +126,7 @@ func insertFakeAssets(c *mgo.Collection) {
 
 }
 
-func toInt(s string) int64 {
+func toInt(s string) int {
 	i, _ := strconv.ParseInt(s, 10, 0)
-	return i
+	return int(i)
 }
