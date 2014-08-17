@@ -1,12 +1,17 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"labix.org/v2/mgo"
+)
+
+const (
+	databaseAddress string = "localhost"
+	databaseName    string = "test"
+	collectionName  string = "assetVersions"
 )
 
 // Asset contains the SOLR SlotID for the given details
@@ -18,11 +23,13 @@ type Asset struct {
 }
 
 func main() {
-	mongoSession := getDBSession("localhost")
-	defer mongoSession.Close() // defer runs when the enclosing func (in this case, `main`) returns
-
-	coll := mongoSession.DB("test").C("assetVersions")
-	insertFakeAssets(coll)
+	mgoSession, err := mgo.Dial(databaseAddress)
+	if err != nil {
+		panic(err)
+	}
+	defer mgoSession.Close()
+	// put some data in there, just to play around
+	insertFakeAssets(mgoSession.DB(databaseName).C(collectionName))
 
 	// Initialize HTTP server
 	r := gin.Default()
@@ -30,19 +37,19 @@ func main() {
 	r.GET("/asset_version/:divisionCode/:assetType/slot", func(c *gin.Context) {
 		divisionCode := c.Params.ByName("divisionCode")
 		assetType := toInt(c.Params.ByName("assetType"))
-		query := Asset{
+		environment := getQueryStringParameter(c.Request, "environment")
+
+		query := &Asset{
 			DivisionCode: divisionCode,
 			AssetType:    assetType,
+			Environment:  environment,
 		}
 
-		environment, err := getQueryStringParameter(c.Request, "environment")
-		if err == nil {
-			query.Environment = environment
-		}
+		session := mgoSession.Copy()
+		defer session.Close() // defer runs when the enclosing func returns
+		coll := session.DB(databaseName).C(collectionName)
 
-		fmt.Println(query)
-
-		asset, err := findAsset(coll, &query)
+		asset, err := findAsset(coll, query)
 
 		if err != nil {
 			c.String(404, err.Error())
@@ -65,30 +72,16 @@ func findAsset(coll *mgo.Collection, query *Asset) (*Asset, error) {
 	return &result, nil
 }
 
-type errorString struct {
-	message string
-}
-
-func (s errorString) Error() string {
-	return s.message
-}
-
-func getQueryStringParameter(req *http.Request, parameter string) (string, error) {
+func getQueryStringParameter(req *http.Request, parameter string) string {
 	values := req.URL.Query()[parameter]
 	if len(values) == 0 {
-		return "", errorString{message: "no such parameter"}
+		return ""
 	}
-	return values[0], nil
+	return values[0]
 }
 
-// getSession returns a session of mongodb running on host
-func getDBSession(host string) *mgo.Session {
-	session, err := mgo.Dial(host)
-	if err != nil {
-		panic(err)
-	}
-	return session
-}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 func insertFakeAssets(c *mgo.Collection) {
 	assets := []Asset{
