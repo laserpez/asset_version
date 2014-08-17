@@ -85,25 +85,25 @@ func getQueryStringParameter(req *http.Request, parameter string) string {
 
 func insertFakeAssets(c *mgo.Collection) {
 	assets := []Asset{
-		Asset{
+		{
 			SlotID:       1,
 			AssetType:    2,
 			DivisionCode: "Truzzardi",
 			Environment:  "preview",
 		},
-		Asset{
+		{
 			SlotID:       1,
 			AssetType:    2,
 			DivisionCode: "Prada",
 			Environment:  "preview",
 		},
-		Asset{
+		{
 			SlotID:       1,
 			AssetType:    2,
 			DivisionCode: "Truzzardi",
 			Environment:  "production",
 		},
-		Asset{
+		{
 			SlotID:       1,
 			AssetType:    2,
 			DivisionCode: "VinDiesel",
