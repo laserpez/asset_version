@@ -49,7 +49,8 @@ func main() {
 		defer session.Close() // defer runs when the enclosing func returns
 		coll := session.DB(databaseName).C(collectionName)
 
-		asset, err := findAsset(coll, query)
+		asset := Asset{}
+		err := coll.Find(query).One(&asset)
 
 		if err != nil {
 			c.String(404, err.Error())
@@ -61,15 +62,6 @@ func main() {
 
 	// Launch server and listen on 0.0.0.0:8080
 	r.Run(":8080")
-}
-
-func findAsset(coll *mgo.Collection, query *Asset) (*Asset, error) {
-	result := Asset{}
-	err := coll.Find(query).One(&result)
-	if err != nil {
-		return &result, err
-	}
-	return &result, nil
 }
 
 func getQueryStringParameter(req *http.Request, parameter string) string {
