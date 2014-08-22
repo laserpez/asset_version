@@ -1,7 +1,7 @@
 # prerequisites
 
 - `bzr`
-- `go`
+- `go` 1.3
 - `mongodb` running on localhost
 
 # install
